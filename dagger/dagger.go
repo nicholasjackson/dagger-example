@@ -58,7 +58,7 @@ func main() {
     os.Exit(1)
   }
 
-  cn,err := client.Container().Build(src).Publish(ctx, "nicholasjackson/dagger-example:latest")
+  cn,err := client.Container().Build(build).Publish(ctx, "nicholasjackson/dagger-example:latest")
   if err != nil {
     fmt.Printf("Error creating and pushing container: %s", err)
     os.Exit(1)
