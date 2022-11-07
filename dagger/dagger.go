@@ -84,10 +84,11 @@ func main() {
 	state := cdktf.File("./terraform.src.tfstate")
 	_, err = state.Export(ctx, "./deploy/terraform.src.tfstate")
 
+	// we need to get the terraform state from the container as this needs to be cached
+	state := cdktf.File("./terraform.src.tfstate")
+	_, err = state.Export(ctx, "./deploy/terraform.src.tfstate")
 	if err != nil {
 		fmt.Printf("Error deploying application to DigitalOcean: %s", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("Succesfully created new container: %s", cn)
 }
