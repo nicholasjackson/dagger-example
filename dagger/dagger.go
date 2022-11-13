@@ -64,8 +64,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = client.Container().
-		Build(src).
+  client.Close()
+	client, _ = dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
+
+  buildDir := client.Host().Workdir() 
+
+  _, err = client.Container().
+    Build(buildDir).
 		Publish(ctx, "nicholasjackson/dagger-example:latest")
 
 	if err != nil {
@@ -99,6 +104,7 @@ func main() {
 
   // remove the credentials
   os.Remove("./credentials.tfrc.json")
+  os.Remove("./build")
 	
   if err != nil {
 		fmt.Printf("Error deploying application: %s", err)
