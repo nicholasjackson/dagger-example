@@ -20,6 +20,17 @@ func main() {
 
 func apply() error {
 	ctx := context.Background()
+  
+  // add the token to the backend
+  // need to do this here or it is not picked up
+  os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
+{
+  "credentials": {
+    "app.terraform.io": {
+      "token": "%s"
+    }
+  }
+}`, os.Getenv("TFE_TOKEN"))), 0644)
 
   os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
 {
@@ -80,6 +91,8 @@ func apply() error {
 
 	cdktf := client.Container().From("nicholasjackson/cdktf:1.3.4").
 		WithEnvVariable("DIGITALOCEAN_TOKEN", os.Getenv("DIGITALOCEAN_TOKEN")).
+    WithEnvVariable("CACHEBUST", fmt.Sprintf("%d", time.Now().Nanosecond())).
+    WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
 		WithMountedDirectory("/src", deploy).
     WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
 		WithWorkdir("/src").
@@ -94,7 +107,7 @@ func apply() error {
 			Args: []string{"cdktf", "apply", "--auto-approve"},
 		},
 	).ExitCode(ctx)
-
+  
 	if err != nil {
 		return fmt.Errorf("Error deploying application to DigitalOcean: %s", err)
 	}
