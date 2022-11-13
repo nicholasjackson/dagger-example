@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+  "flag"
 
 	"dagger.io/dagger"
 )
 
+var doDeploy = flag.Bool("do-deploy", false, "Should we deploy the application")
+
 func main() {
+  flag.Parse() 
+
   err := apply()
   if err != nil {
     fmt.Println(err)
@@ -23,15 +28,6 @@ func apply() error {
   
   // add the token to the backend
   // need to do this here or it is not picked up
-  os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
-{
-  "credentials": {
-    "app.terraform.io": {
-      "token": "%s"
-    }
-  }
-}`, os.Getenv("TFE_TOKEN"))), 0644)
-
   os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
 {
   "credentials": {
@@ -83,34 +79,35 @@ func apply() error {
 		return fmt.Errorf("Error creating and pushing container: %s", err)
 	}
 
-	deploy := client.Host().Workdir().
-		Directory("./deploy").
-		WithoutDirectory("cdktf.out")
+  if *doDeploy {
+	  deploy := client.Host().Workdir().
+	  	Directory("./deploy").
+	  	WithoutDirectory("cdktf.out")
 
-  creds := client.Host().Workdir().File("./credentials.tfrc.json")
+    creds := client.Host().Workdir().File("./credentials.tfrc.json")
 
-	cdktf := client.Container().From("nicholasjackson/cdktf:1.3.4").
-		WithEnvVariable("DIGITALOCEAN_TOKEN", os.Getenv("DIGITALOCEAN_TOKEN")).
-    WithEnvVariable("CACHEBUST", fmt.Sprintf("%d", time.Now().Nanosecond())).
-    WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
-		WithMountedDirectory("/src", deploy).
-    WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
-		WithWorkdir("/src").
-		WithEntrypoint([]string{})
+	  cdktf := client.Container().From("nicholasjackson/cdktf:1.3.4").
+	  	WithEnvVariable("DIGITALOCEAN_TOKEN", os.Getenv("DIGITALOCEAN_TOKEN")).
+      WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
+	  	WithMountedDirectory("/src", deploy).
+      WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
+	  	WithWorkdir("/src").
+	  	WithEntrypoint([]string{})
 
-	_,err = cdktf.Exec(
-		dagger.ContainerExecOpts{
-			Args: []string{"cdktf", "get"},
-		},
-	).Exec(
-		dagger.ContainerExecOpts{
-			Args: []string{"cdktf", "apply", "--auto-approve"},
-		},
-	).ExitCode(ctx)
-  
-	if err != nil {
-		return fmt.Errorf("Error deploying application to DigitalOcean: %s", err)
-	}
+	  _,err = cdktf.Exec(
+	  	dagger.ContainerExecOpts{
+	  		Args: []string{"cdktf", "get"},
+	  	},
+	  ).Exec(
+	  	dagger.ContainerExecOpts{
+	  		Args: []string{"cdktf", "apply", "--auto-approve"},
+	  	},
+	  ).ExitCode(ctx)
+    
+	  if err != nil {
+	  	return fmt.Errorf("Error deploying application to DigitalOcean: %s", err)
+	  }
+  }
 
   return nil
 }
