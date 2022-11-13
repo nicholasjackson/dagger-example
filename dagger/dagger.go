@@ -5,12 +5,24 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"dagger.io/dagger"
 )
 
 func main() {
 	ctx := context.Background()
+  
+  // add the token to the backend
+  // need to do this here or it is not picked up
+  os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
+{
+  "credentials": {
+    "app.terraform.io": {
+      "token": "%s"
+    }
+  }
+}`, os.Getenv("TFE_TOKEN"))), 0644)
 
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
 	if err != nil {
@@ -52,7 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cn, err := client.Container().
+	_, err = client.Container().
 		Build(src).
 		Publish(ctx, "nicholasjackson/dagger-example:latest")
 
@@ -65,13 +77,17 @@ func main() {
 		Directory("./deploy").
 		WithoutDirectory("cdktf.out")
 
-	cdktf := client.Container().From("nicholasjackson/cdktf:latest").
+  creds := client.Host().Workdir().File("./credentials.tfrc.json")
+
+	cdktf := client.Container().From("nicholasjackson/cdktf:1.3.4").
 		WithEnvVariable("DIGITALOCEAN_TOKEN", os.Getenv("DIGITALOCEAN_TOKEN")).
+    WithEnvVariable("CACHEBUST", fmt.Sprintf("%d", time.Now().Nanosecond())).
+    WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
 		WithMountedDirectory("/src", deploy).
 		WithWorkdir("/src").
 		WithEntrypoint([]string{})
 
-	cdktf = cdktf.Exec(
+	_,err = cdktf.Exec(
 		dagger.ContainerExecOpts{
 			Args: []string{"cdktf", "get"},
 		},
@@ -79,16 +95,13 @@ func main() {
 		dagger.ContainerExecOpts{
 			Args: []string{"cdktf", "apply", "--auto-approve"},
 		},
-	)
+	).ExitCode(ctx)
 
-	state := cdktf.File("./terraform.src.tfstate")
-	_, err = state.Export(ctx, "./deploy/terraform.src.tfstate")
-
-	// we need to get the terraform state from the container as this needs to be cached
-	state := cdktf.File("./terraform.src.tfstate")
-	_, err = state.Export(ctx, "./deploy/terraform.src.tfstate")
-	if err != nil {
-		fmt.Printf("Error deploying application to DigitalOcean: %s", err)
+  // remove the credentials
+  os.Remove("./credentials.tfrc.json")
+	
+  if err != nil {
+		fmt.Printf("Error deploying application: %s", err)
 		os.Exit(1)
 	}
 }

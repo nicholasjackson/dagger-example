@@ -10,6 +10,12 @@ import (
 func NewMyStack(scope constructs.Construct, id string) cdktf.TerraformStack {
 	stack := cdktf.NewTerraformStack(scope, &id)
 
+  cdktf.NewCloudBackend(stack, &cdktf.CloudBackendProps{ 
+    Hostname: jsii.String("app.terraform.io"),
+    Organization: jsii.String("niccorp"),
+    Workspaces: cdktf.NewNamedCloudWorkspace(jsii.String("dagger-dev")),
+  })
+
 	digitalocean.NewDigitaloceanProvider(stack, jsii.String("digitalocean"), &digitalocean.DigitaloceanProviderConfig{})
 
 	app := digitalocean.NewApp(stack, jsii.String("dagger"), &digitalocean.AppConfig{
