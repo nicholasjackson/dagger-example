@@ -58,20 +58,13 @@ func main() {
 
 	build := golang.Directory(path)
 
-	_, err = build.Export(ctx, path)
-	if err != nil {
-		fmt.Printf("Error writing directory: %s", err)
-		os.Exit(1)
-	}
-
-  client.Close()
-	client, _ = dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
-
-  buildDir := client.Host().Workdir() 
-
-  _, err = client.Container().
-    Build(buildDir).
-		Publish(ctx, "nicholasjackson/dagger-example:latest")
+  _, err = client.Container().From("alpine:latest").
+      WithMountedDirectory("/tmp", build).
+      Exec(dagger.ContainerExecOpts{
+        Args:[]string{"cp", "/tmp/dagger-example", "/bin/dagger-example"},
+      }).
+      WithEntrypoint([]string{"/bin/dagger-example"}).
+		  Publish(ctx, "nicholasjackson/dagger-example:latest")
 
 	if err != nil {
 		fmt.Printf("Error creating and pushing container: %s", err)
