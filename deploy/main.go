@@ -10,21 +10,25 @@ import (
 func NewMyStack(scope constructs.Construct, id string) cdktf.TerraformStack {
 	stack := cdktf.NewTerraformStack(scope, &id)
 
+  workspace := cdktf.NewTerraformVariable(stack, jsii.String("workspace"), &cdktf.TerraformVariableConfig{
+    Default: jsii.String("dagger-example-dev"),
+  })
+
   cdktf.NewCloudBackend(stack, &cdktf.CloudBackendProps{ 
     Hostname: jsii.String("app.terraform.io"),
     Organization: jsii.String("niccorp"),
-    Workspaces: cdktf.NewNamedCloudWorkspace(jsii.String("dagger-dev")),
+    Workspaces: cdktf.NewNamedCloudWorkspace(jsii.String("dagger-example-dev")),
   })
 
 	digitalocean.NewDigitaloceanProvider(stack, jsii.String("digitalocean"), &digitalocean.DigitaloceanProviderConfig{})
 
 	app := digitalocean.NewApp(stack, jsii.String("dagger"), &digitalocean.AppConfig{
 		Spec: &digitalocean.AppSpec{
-			Name:   jsii.String("dagger"),
+			Name:   workspace.StringValue(),
 			Region: jsii.String("ams"),
 			Service: []*digitalocean.AppSpecService{
 				&digitalocean.AppSpecService{
-					Name:     jsii.String("dagger"),
+					Name:     workspace.StringValue(),
 					HttpPort: jsii.Number(9090),
 					Image: &digitalocean.AppSpecServiceImage{
 						RegistryType: jsii.String("DOCKER_HUB"),

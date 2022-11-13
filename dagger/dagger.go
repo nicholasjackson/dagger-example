@@ -4,13 +4,21 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
 	"dagger.io/dagger"
 )
 
 func main() {
+  err := apply()
+  if err != nil {
+    fmt.Println(err)
+		os.Exit(1)
+  }
+
+	fmt.Println("Succesfully deployed")
+}
+
+func apply() error {
 	ctx := context.Background()
   
   // add the token to the backend
@@ -24,18 +32,29 @@ func main() {
   }
 }`, os.Getenv("TFE_TOKEN"))), 0644)
 
+  os.WriteFile("./credentials.tfrc.json", []byte(fmt.Sprintf(`  
+{
+  "credentials": {
+    "app.terraform.io": {
+      "token": "%s"
+    }
+  }
+}`, os.Getenv("TFE_TOKEN"))), 0644)
+
+  defer func() {
+    os.Remove("./credentials.tfrc.json")
+  }()
+
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stdout))
 	if err != nil {
-		fmt.Printf("Error connecting to Dagger Engine: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("Error connecting to Dagger Engine: %s", err)
 	}
 
 	defer client.Close()
 
 	src := client.Host().Workdir()
 	if err != nil {
-		fmt.Printf("Error getting reference to host directory: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("Error getting reference to host directory: %s", err)
 	}
 
 	golang := client.Container().From("golang:latest")
@@ -50,25 +69,18 @@ func main() {
 	)
 
 	path := "build/"
-	err = os.MkdirAll(filepath.Join(".", path), os.ModePerm)
-	if err != nil {
-		fmt.Printf("Error creating output folder: %s", err)
-		os.Exit(1)
-	}
-
 	build := golang.Directory(path)
 
   _, err = client.Container().From("alpine:latest").
-      WithMountedDirectory("/tmp", build).
-      Exec(dagger.ContainerExecOpts{
-        Args:[]string{"cp", "/tmp/dagger-example", "/bin/dagger-example"},
-      }).
-      WithEntrypoint([]string{"/bin/dagger-example"}).
-		  Publish(ctx, "nicholasjackson/dagger-example:latest")
+    WithMountedDirectory("/tmp", build).
+    Exec(dagger.ContainerExecOpts{ 
+      Args: []string{"cp", "/tmp/dagger-example","/bin/dagger-example"},
+    }).
+    WithEntrypoint([]string{"/bin/dagger-example"}).
+		Publish(ctx, "nicholasjackson/dagger-example:latest")
 
 	if err != nil {
-		fmt.Printf("Error creating and pushing container: %s", err)
-		os.Exit(1)
+		return fmt.Errorf("Error creating and pushing container: %s", err)
 	}
 
 	deploy := client.Host().Workdir().
@@ -82,6 +94,7 @@ func main() {
     WithEnvVariable("CACHEBUST", fmt.Sprintf("%d", time.Now().Nanosecond())).
     WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
 		WithMountedDirectory("/src", deploy).
+    WithMountedFile("/root/.terraform.d/credentials.tfrc.json", creds).
 		WithWorkdir("/src").
 		WithEntrypoint([]string{})
 
@@ -94,13 +107,10 @@ func main() {
 			Args: []string{"cdktf", "apply", "--auto-approve"},
 		},
 	).ExitCode(ctx)
-
-  // remove the credentials
-  os.Remove("./credentials.tfrc.json")
-  os.Remove("./build")
-	
-  if err != nil {
-		fmt.Printf("Error deploying application: %s", err)
-		os.Exit(1)
+  
+	if err != nil {
+		return fmt.Errorf("Error deploying application to DigitalOcean: %s", err)
 	}
+
+  return nil
 }

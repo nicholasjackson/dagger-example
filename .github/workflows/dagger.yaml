@@ -1,0 +1,29 @@
+name: Dagger
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    -
+      name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - name: Deploy
+      run: go run ./dagger
+      env:
+        DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
