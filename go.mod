@@ -4,7 +4,10 @@ go 1.19
 
 replace github.com/docker/docker => github.com/docker/docker v20.10.3-0.20220414164044-61404de7df1a+incompatible
 
-require dagger.io/dagger v0.4.0
+require (
+	dagger.io/dagger v0.4.0
+	github.com/hashicorp/go-hclog v1.3.1
+)
 
 require (
 	github.com/Khan/genqlient v0.5.0 // indirect
@@ -25,6 +28,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/fatih/color v1.13.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
